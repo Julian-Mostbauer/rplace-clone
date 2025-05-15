@@ -1,8 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const socket = io('https://rplace-backend.fly.dev');
-const SIZE = 256;
+const socket = io("https://rplace-backend.fly.dev", {
+  transports: ["websocket"], // Force WebSocket
+  reconnectionAttempts: 5,   // Auto-retry if disconnected
+  withCredentials: true
+});
 
 function App() {
   const canvasRef = useRef(null);
@@ -10,41 +13,31 @@ function App() {
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-
-    // Initialize blank white canvas
+    
+    // Initialize blank canvas
     ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, SIZE, SIZE);
+    ctx.fillRect(0, 0, 256, 256);
 
-    // Listen for pixel updates
     socket.on('init-canvas', ({ data }) => {
-      // Draw initial canvas (omitted for brevity)
+      // Draw initial canvas (pseudo-code)
+      for (let i = 0; i < data.length; i += 3) {
+        const x = (i / 3) % 256;
+        const y = Math.floor((i / 3) / 256);
+        ctx.fillStyle = `rgb(${data[i]}, ${data[i+1]}, ${data[i+2]})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
     });
 
     socket.on('pixel-updated', ({ x, y, color }) => {
       ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
       ctx.fillRect(x, y, 1, 1);
     });
+
+    return () => {
+      socket.off('init-canvas');
+      socket.off('pixel-updated');
+    };
   }, []);
 
-  const handleClick = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.floor(e.clientX - rect.left);
-    const y = Math.floor(e.clientY - rect.top);
-    const color = { r: 255, g: 0, b: 0 }; // Red
-    socket.emit('place-pixel', { x, y, color }, (res) => {
-      if (res.error) alert(res.error);
-    });
-  };
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={SIZE}
-      height={SIZE}
-      onClick={handleClick}
-      style={{ border: '1px solid black', cursor: 'pointer' }}
-    />
-  );
+  // (Keep your existing click handler)
 }
-
-export default App;
